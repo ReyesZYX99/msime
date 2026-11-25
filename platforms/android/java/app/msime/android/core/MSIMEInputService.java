@@ -3826,11 +3826,10 @@ public final class MSIMEInputService extends InputMethodService {
         return touchKeySpacingTenths + ":" + touchRowSpacingTenths + ":"
             + touchKeyboardHeightAdjustment + ":"
             + touchVoiceShortcutEnabled + ":" + voiceInputEnabled + ":" + voiceLanguage + ":"
-            + shuangpinKeyHintsEnabled + ":" + quanpinShiftEnabled + ":" + splitKeyboardPortrait + ":" + japaneseToggleInputEnabled
+            + shuangpinKeyHintsEnabled + ":" + nineKeyShuangpinHintMode + ":" + quanpinShiftEnabled + ":" + splitKeyboardPortrait + ":" + japaneseToggleInputEnabled
             + ":" + spellingEditorEnabled + ":" + oneHandedSidePanel.wire + ":" + fourteenKeyLetterWidths.wire()
             + ":" + touchKeyStyles + ":" + numberRowEnabled + ":" + twentySixSymbolFirst + ":" + numberPadSpace.resolved() + ":" + languageKeyLeft
-            + ":" + NineKeySidebarPolicy.format(nineKeySidebarSymbols) + ":" + NineKeySidebarPolicy.format(nineKeyDigitSidebarSymbols)
-            + ":" + nineKeyShuangpinHintMode;
+            + ":" + NineKeySidebarPolicy.format(nineKeySidebarSymbols) + ":" + NineKeySidebarPolicy.format(nineKeyDigitSidebarSymbols);
     }
 
     private void reloadPreferences(String response) {
