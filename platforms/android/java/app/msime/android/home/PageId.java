@@ -63,7 +63,7 @@ public enum PageId {
     WUBI_LOOKUP("WubiLookupPage", "五笔查码", HostDeepLink.TAB_SETTINGS,
         "查汉字的五笔编码", "五笔编码", "86 五笔", "98 五笔", "反查"),
     NINE_KEY_SHUANGPIN("NineKeyShuangpinPage", "九键双拼", HostDeepLink.TAB_SETTINGS,
-        "方案", "使用九键双拼键盘", "米旮旯 3", "米旮旯 2", "辜氏 2 低重码", "自定义", "键位", "自定义表",
+        "方案", "使用九键双拼键盘", "米旮旯 3", "米旮旯 2", "辜氏 2 低重码", "自定义", "键面提示", "键位", "自定义表",
         "从内置方案开始", "导入", "导出", "保存并使用", "声母", "韵母", "零声母"),
     SHUANGPIN_CUSTOM("ShuangpinCustomPage", "双拼自定义", HostDeepLink.TAB_SETTINGS,
         "方案", "使用双拼键盘", "小鹤双拼", "自然码双拼", "首道双拼", "微软双拼", "智能 ABC 双拼", "自定义", "键位", "自定义表",
