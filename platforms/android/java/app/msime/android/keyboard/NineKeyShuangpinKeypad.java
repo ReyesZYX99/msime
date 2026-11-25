@@ -25,6 +25,34 @@ public final class NineKeyShuangpinKeypad {
     public static final String DEFAULT_PROFILE = "migala3";
     public static final String CUSTOM_PROFILE = "custom";
 
+    /** 九键双拼键面提示模式：仅声母（原版精简）、声母和韵母同显、按声母后动态切韵母。 */
+    public static final String HINT_MODE_COMPACT = "compact";
+    public static final String HINT_MODE_BOTH = "both";
+    public static final String HINT_MODE_DYNAMIC = "dynamic";
+    public static final String DEFAULT_HINT_MODE = HINT_MODE_COMPACT;
+    public static final List<String> HINT_MODES = List.of(HINT_MODE_COMPACT, HINT_MODE_BOTH, HINT_MODE_DYNAMIC);
+
+    public static String normalizedHintMode(String value) {
+        if (value != null && HINT_MODES.contains(value)) return value;
+        return DEFAULT_HINT_MODE;
+    }
+
+    public static String hintModeTitle(String mode) {
+        return switch (normalizedHintMode(mode)) {
+            case HINT_MODE_BOTH -> "声母和韵母";
+            case HINT_MODE_DYNAMIC -> "动态切换";
+            default -> "仅声母";
+        };
+    }
+
+    public static String hintModeSummary(String mode) {
+        return switch (normalizedHintMode(mode)) {
+            case HINT_MODE_BOTH -> "键面同时显示声母和韵母";
+            case HINT_MODE_DYNAMIC -> "初始显示声母，按下声母后切换显示韵母";
+            default -> "精简显示声母，仅韵母键标注「韵母」";
+        };
+    }
+
     /** 只认四个取值，其余（缺省、未知值）按缺省的米旮旯 3，与共享偏好的缺省一致。 */
     public static String normalizedProfile(String value) {
         if (value != null && (CUSTOM_PROFILE.equals(value) || BUILTIN_PROFILES.contains(value))) return value;
@@ -63,6 +91,63 @@ public final class NineKeyShuangpinKeypad {
     public static String compactHint(Face face) {
         String initials = initialsLine(face);
         return initials.isEmpty() ? (face.finals().isEmpty() ? "" : "韵母") : initials;
+    }
+
+    /** 仅韵母提示：用于动态切换模式下等待输入韵母时。 */
+    public static String finalsHint(Face face) {
+        return String.join(" ", face.finals());
+    }
+
+    /** 按键面提示模式和当前输入阶段给出键面底部文字。 */
+    public static String hint(Face face, String mode, boolean expectingFinal) {
+        return switch (normalizedHintMode(mode)) {
+            case HINT_MODE_BOTH -> label(face);
+            case HINT_MODE_DYNAMIC -> expectingFinal ? finalsHint(face) : compactHint(face);
+            default -> compactHint(face);
+        };
+    }
+
+    /**
+     * 当前是否正等待输入九键双拼的第二击（韵母）。
+     *
+     * <p>规则：九键双拼每个完整音节固定两位数字；以 `preedit` 中最后一个分词符 `'` 之后的未锁定数字段长度奇偶判定（奇数为刚打完声母、等待韵母；偶数、空串或已锁定字母段则等待新音节声母）。当光标停在组字串中间时按光标前的段内数字数判定。
+     */
+    public static boolean expectingFinal(String preedit, String editingText, int caretPosition) {
+        if (editingText == null || editingText.isEmpty()) return false;
+        String safePreedit = preedit == null ? "" : preedit;
+        int len = editingText.length();
+        int caret = caretPosition < 0 ? len : Math.min(caretPosition, len);
+        if (caret == 0) return false;
+        if (caret < len && !safePreedit.isEmpty()) {
+            int seenDigits = 0;
+            int segmentDigits = 0;
+            boolean hasLetters = false;
+            for (int index = 0; index < safePreedit.length() && seenDigits < caret; index++) {
+                char ch = safePreedit.charAt(index);
+                if (ch == '\'') {
+                    segmentDigits = 0;
+                } else if (ch >= '0' && ch <= '9') {
+                    seenDigits++;
+                    segmentDigits++;
+                } else {
+                    hasLetters = true;
+                    break;
+                }
+            }
+            if (!hasLetters && seenDigits == caret) return (segmentDigits & 1) == 1;
+            return (caret & 1) == 1;
+        }
+        if (!safePreedit.isEmpty()) {
+            int sep = safePreedit.lastIndexOf('\'');
+            String tail = sep < 0 ? safePreedit : safePreedit.substring(sep + 1);
+            if (tail.isEmpty()) return false;
+            for (int index = 0; index < tail.length(); index++) {
+                char ch = tail.charAt(index);
+                if (ch < '0' || ch > '9') return false;
+            }
+            return (tail.length() & 1) == 1;
+        }
+        return (caret & 1) == 1;
     }
 
     private static String initialsLine(Face face) {

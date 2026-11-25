@@ -18,7 +18,7 @@ final class ImeKeyFaces {
 
     /** 决定内容域、字体和环境的几项；都没变时 {@link #refresh} 什么也不做。 */
     private record Inputs(float density, float fontScale, boolean monospaced, KeyOutline outline, boolean corners,
-            ChineseSymbolFaces.Marks marks, boolean variant) { }
+            ChineseSymbolFaces.Marks marks, String nineKeyShuangpinHintMode, boolean variant) { }
 
     private final MSIMEInputService s;
     private KeyFaceGroup letters;
@@ -33,6 +33,9 @@ final class ImeKeyFaces {
     private Inputs nineLettersBuilt;
     private KeyFaceGroup nineDigits;
     private Inputs nineDigitsBuilt;
+    /** 九键双拼底行 0 键独立键组：0 键比九宫格 1–9 窄得多，单列一组不拖累 1–9 键的提示字号。 */
+    private KeyFaceGroup nineZero;
+    private Inputs nineZeroBuilt;
     /** 放进过组的键里建键行后还会留着用的那些（⇧、⌫、底行的 0 等），清空时拿出组。 */
     private final java.util.List<KeyboardPressButton> movableKeys = new java.util.ArrayList<>();
 
@@ -56,6 +59,8 @@ final class ImeKeyFaces {
         nineLettersBuilt = null;
         nineDigits = null;
         nineDigitsBuilt = null;
+        nineZero = null;
+        nineZeroBuilt = null;
     }
 
     /** 26 键（和同一套字母行的其他语言）字母层的一个字母键。 */
@@ -131,6 +136,20 @@ final class ImeKeyFaces {
         if (!movableKeys.contains(press)) movableKeys.add(press);
     }
 
+    /** 九键双拼底行 0 键：独立键组，不让窄 0 键压小 1–9 网格键的声韵提示字号。 */
+    void attachNineShuangpinZero(android.widget.Button key) {
+        if (!(key instanceof KeyboardPressButton press)) return;
+        if (nineZero == null) {
+            nineZeroBuilt = inputs(true);
+            nineZero = new KeyFaceGroup(KeyFaceTemplates.NINE_DIGITS, environment(nineZeroBuilt),
+                NineKeyFaceDomains.shuangpinZero(s.nineKeyShuangpinFaces(), nineZeroBuilt.nineKeyShuangpinHintMode()),
+                nineMeasurer(nineZeroBuilt));
+        }
+        if (press.faceGroup() == nineZero) return;
+        press.setFaceGroup(nineZero, Set.of(KeyFaceSlot.BOTTOM));
+        if (!movableKeys.contains(press)) movableKeys.add(press);
+    }
+
     /** 功能键的字以同一副键盘的字母为上限：26 键一族是字母组，14/18 键是网格字母组，拼音九键是九键字母组。 */
     private void linkFunctions() {
         if (functions != null)
@@ -178,7 +197,15 @@ final class ImeKeyFaces {
             Inputs now = inputs(nineDigitsBuilt.variant());
             if (!now.equals(nineDigitsBuilt)) {
                 nineDigitsBuilt = now;
-                nineDigits.replace(environment(now), nineMeasurer(now), nineDigitDomain(now.variant()));
+                nineDigits.replace(environment(now), nineMeasurer(now), nineDigitDomain(now.variant(), now.nineKeyShuangpinHintMode()));
+            }
+        }
+        if (nineZero != null) {
+            Inputs now = inputs(true);
+            if (!now.equals(nineZeroBuilt)) {
+                nineZeroBuilt = now;
+                nineZero.replace(environment(now), nineMeasurer(now),
+                    NineKeyFaceDomains.shuangpinZero(s.nineKeyShuangpinFaces(), now.nineKeyShuangpinHintMode()));
             }
         }
     }
@@ -190,7 +217,11 @@ final class ImeKeyFaces {
     }
 
     private KeyFaceDomain nineDigitDomain(boolean shuangpin) {
-        return shuangpin ? NineKeyFaceDomains.shuangpin(s.nineKeyShuangpinFaces()) : NineKeyFaceDomains.digits();
+        return nineDigitDomain(shuangpin, s.nineKeyShuangpinHintMode);
+    }
+
+    private KeyFaceDomain nineDigitDomain(boolean shuangpin, String hintMode) {
+        return shuangpin ? NineKeyFaceDomains.shuangpinGrid(s.nineKeyShuangpinFaces(), hintMode) : NineKeyFaceDomains.digits();
     }
 
     /** {@code variant} 区分同一类组的两种内容域：14/18 键里是 18 键，九键数字组里是九键双拼。 */
@@ -199,7 +230,8 @@ final class ImeKeyFaces {
         float density = s.getResources().getDisplayMetrics().density;
         return new Inputs(density, KeyboardTypographyPolicy.keyboardFontScale(configuration.fontScale),
             s.skin != null && s.skin.monospaced(), KeyOutline.forSkin(s.skin, density),
-            s.localSettings.bool(AndroidLocalSettings.LETTER_CORNER_HINTS), s.punctuationMarks(), variant);
+            s.localSettings.bool(AndroidLocalSettings.LETTER_CORNER_HINTS), s.punctuationMarks(),
+            s.nineKeyShuangpinHintMode, variant);
     }
 
     private static KeyFaceEnvironment environment(Inputs inputs) {

@@ -14,6 +14,8 @@ import java.util.Map;
 public record KeyFaceDomain(Map<KeyFaceSlot, List<String>> texts) {
     /** 量字的基准字号（像素）：内容域只在这个字号下量一次，其他字号按比例换算。 */
     public static final float REFERENCE_PX = 100f;
+    /** 多行底部提示（以 `\n` 分行）两行基线间距与字号的比例。 */
+    public static final float MULTILINE_STEP_EM = 1.15f;
 
     public KeyFaceDomain {
         EnumMap<KeyFaceSlot, List<String>> copy = new EnumMap<>(KeyFaceSlot.class);
@@ -80,6 +82,23 @@ public record KeyFaceDomain(Map<KeyFaceSlot, List<String>> texts) {
             KeyFaceSlot slot = entry.getKey();
             float width = 0, inkWidth = 0, inkTop = 0, inkBottom = 0;
             for (String text : entry.getValue()) {
+                if (slot == KeyFaceSlot.BOTTOM && text.indexOf('\n') >= 0) {
+                    String[] lines = text.split("\n", -1);
+                    float firstTop = 0, lastBottom = 0;
+                    for (int lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+                        String line = lines[lineIndex];
+                        if (line.isEmpty()) continue;
+                        KeyFaceMeasurer.Ink lineInk = measurer.ink(slot, line, REFERENCE_PX);
+                        float lineAdvance = measurer.advance(slot, line, REFERENCE_PX);
+                        width = Math.max(width, lineAdvance);
+                        inkWidth = Math.max(inkWidth, lineInk.width());
+                        if (lineIndex == 0) firstTop = Math.min(firstTop, lineInk.top());
+                        if (lineIndex == lines.length - 1) lastBottom = Math.max(lastBottom, lineInk.bottom());
+                    }
+                    inkTop = Math.min(inkTop, firstTop - (lines.length - 1) * MULTILINE_STEP_EM * REFERENCE_PX);
+                    inkBottom = Math.max(inkBottom, lastBottom);
+                    continue;
+                }
                 KeyFaceMeasurer.Ink ink = measurer.ink(slot, text, REFERENCE_PX);
                 float advance = slot == KeyFaceSlot.MAIN ? mainWidth(measurer, text, REFERENCE_PX, pairGapEm)
                     : measurer.advance(slot, text, REFERENCE_PX);

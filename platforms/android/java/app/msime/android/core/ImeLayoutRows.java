@@ -405,6 +405,8 @@ final class ImeLayoutRows {
 
     /** 九宫格建出来时是否画着九键双拼、按的是哪些键面；没画九键双拼时为 null。拼音九键和九键双拼是同一个触屏布局，布局编号不变时要靠它判断键面过期（{@link #shuangpinStale}）。 */
     private java.util.List<NineKeyShuangpinKeypad.Face> builtShuangpinFaces;
+    /** 九键双拼的 0–9 键帽引用，供动态切换声母/韵母和就地切换提示模式时更新。 */
+    private final NineKeyDigitButton[] shuangpinDigitKeys = new NineKeyDigitButton[10];
     /** 当前键行是 {@link #rebuildNineKeyRows} 建的。 */
     private boolean builtNineKeyGrid;
 
@@ -424,6 +426,7 @@ final class ImeLayoutRows {
     void forgetNineKeyGrid() {
         builtNineKeyGrid = false;
         builtShuangpinFaces = null;
+        java.util.Arrays.fill(shuangpinDigitKeys, null);
         builtNineFrame = false;
         builtTallReturn = false;
         builtSpaceInColumn = null;
@@ -809,6 +812,7 @@ final class ImeLayoutRows {
      * <p>每个数字键以数字为主标签，附单行简短提示（{@link NineKeyShuangpinKeypad#compactHint}），点按把数字交给引擎；表没用到的键印着数字本身，点按什么也不送。九键双拼的 1 常常放着韵母（米旮旯、辜氏都用它），所以没有拼音九键 1 键的「@#」常用标点；组字时的「分词」是底行最左的 符（{@link #symbolPanelKey}），0 在底行空格右边（{@link #bindShuangpinZero}），与 iOS、鸿蒙相同。键上的长按和滑动只属于拼音九键（它们给的是键上的字母），这里不绑。
      */
     private void addShuangpinGrid(LinearLayout grid) {
+        java.util.Arrays.fill(shuangpinDigitKeys, null);
         java.util.List<NineKeyShuangpinKeypad.Face> faces = s.nineKeyShuangpinFaces();
         for (java.util.List<NineKeyLayout.Key> keys : NineKeyLayout.rows()) {
             LinearLayout row = LayoutPolicy.keyRow(s);
@@ -846,35 +850,64 @@ final class ImeLayoutRows {
             : "打开符号面板";
     }
 
-    /** 九键双拼字母层底行的 0（空格右边，{@link KeyboardActionRow#withShuangpinZero}）：数字作主标签，表用到 0 时附简短提示。 */
+    /** 九键双拼字母层底行的 0（空格右边，{@link KeyboardActionRow#withShuangpinZero}）：数字作主标签，表用到 0 时附按提示模式生成的提示。 */
     void bindShuangpinZero(Button zero) {
         NineKeyShuangpinKeypad.Face face = NineKeyShuangpinKeypad.face(s.nineKeyShuangpinFaces(), '0');
         if (!"0".contentEquals(zero.getText())) zero.setText("0");
-        if (zero instanceof NineKeyDigitButton key)
-            key.setHintText(face == null ? "" : NineKeyShuangpinKeypad.compactHint(face));
+        if (zero instanceof NineKeyDigitButton key) {
+            shuangpinDigitKeys[0] = key;
+            applyShuangpinHint(key, face, s.nineKeyShuangpinHintMode,
+                NineKeyShuangpinKeypad.HINT_MODE_DYNAMIC.equals(s.nineKeyShuangpinHintMode)
+                    && s.nineKeyShuangpinExpectingFinal());
+        }
         zero.setContentDescription("按键 " + (face == null ? "数字 0" : NineKeyShuangpinKeypad.description(face)));
         s.keyId(zero, "Nine0");
         s.bindCountedAction(zero, face == null ? () -> commitNineKeyLiteral("0") : () -> s.character('0'));
     }
-    /** 九键双拼的一个数字键：数字作主标签，表用到它时附简短提示、点按送这个数字；没用到时只印数字，0 原样上屏，其他键不送。 */
+
+    /** 九键双拼的一个数字键：数字作主标签，表用到它时附按提示模式生成的提示、点按送这个数字；没用到时只印数字，0 原样上屏，其他键不送。 */
     private NineKeyDigitButton shuangpinKey(java.util.List<NineKeyShuangpinKeypad.Face> faces, char digit) {
         NineKeyShuangpinKeypad.Face face = NineKeyShuangpinKeypad.face(faces, digit);
         String digitText = String.valueOf(digit);
         NineKeyDigitButton key;
         if (face != null) {
-            // 数字独占主行，只保留一行简短提示，不再把完整声韵母表铺满键帽。
             key = s.nineKeyGridKey(digitText, NineKeyShuangpinKeypad.description(face),
                 () -> s.character(digit));
-            String hint = NineKeyShuangpinKeypad.compactHint(face);
             KeyboardTypographyPolicy.setKeyTextSize(key, 22);
-            key.setHintText(hint);
+            applyShuangpinHint(key, face, s.nineKeyShuangpinHintMode,
+                NineKeyShuangpinKeypad.HINT_MODE_DYNAMIC.equals(s.nineKeyShuangpinHintMode)
+                    && s.nineKeyShuangpinExpectingFinal());
         } else {
             key = s.nineKeyGridKey(digitText, "数字 " + digit,
                 digit == '0' ? () -> commitNineKeyLiteral("0") : () -> {});
         }
+        shuangpinDigitKeys[digit - '0'] = key;
         s.keyId(key, digit == '0' ? "Nine0" : KeyPressIds.forNineKeyDigit(digit - '0'));
         s.imeKeyFaces.attachNineDigit(key, true);
         return key;
+    }
+
+    /** 就地刷新九键双拼 0–9 键面提示（用于动态切换声母/韵母及设置变更后立即生效，不重建键行）。 */
+    void updateShuangpinKeyHints() {
+        if (!builtNineKeyGrid || builtShuangpinFaces == null
+                || s.keyboardLayer != KeyboardLayout.Layer.LETTERS || !s.nineKeyShuangpinDrawn()) return;
+        String mode = s.nineKeyShuangpinHintMode;
+        boolean expectingFinal = NineKeyShuangpinKeypad.HINT_MODE_DYNAMIC.equals(mode)
+            && s.nineKeyShuangpinExpectingFinal();
+        java.util.List<NineKeyShuangpinKeypad.Face> faces = s.nineKeyShuangpinFaces();
+        for (int digit = 0; digit <= 9; digit++) {
+            NineKeyDigitButton key = shuangpinDigitKeys[digit];
+            if (key == null) continue;
+            NineKeyShuangpinKeypad.Face face = NineKeyShuangpinKeypad.face(faces, (char) ('0' + digit));
+            applyShuangpinHint(key, face, mode, expectingFinal);
+        }
+    }
+
+    private static void applyShuangpinHint(NineKeyDigitButton key, NineKeyShuangpinKeypad.Face face,
+            String mode, boolean expectingFinal) {
+        String hint = face == null ? "" : NineKeyShuangpinKeypad.hint(face, mode, expectingFinal);
+        key.setHintText(hint);
+        key.setAccentHint(face != null && expectingFinal && !hint.isEmpty());
     }
 
     /**

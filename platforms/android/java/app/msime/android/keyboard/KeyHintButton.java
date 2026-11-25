@@ -198,8 +198,10 @@ public class KeyHintButton extends KeyboardPressButton {
         float scale = CompactKeyTypography.scale(getContext(), height);
         ViewPolicy.setTextSize(hintPaint, KeyboardTypographyPolicy.keySp(getContext(), 9) * scale);
         Paint.FontMetrics bottom = hintPaint.getFontMetrics();
+        int hintLines = hintText.indexOf('\n') >= 0 ? 2 : 1;
+        float lineHeight = bottom.bottom - bottom.top;
         int bottomInset = hintText.isEmpty() ? basePaddingBottom
-            : (int) Math.ceil(bottom.bottom - bottom.top + DimensionPolicy.floatPixels(getContext(), 4) * scale);
+            : (int) Math.ceil(lineHeight * hintLines + DimensionPolicy.floatPixels(getContext(), 4) * scale);
         int topInset = basePaddingTop;
         int rightInset = basePaddingRight;
         Paint main = new Paint(getPaint());
@@ -355,12 +357,21 @@ public class KeyHintButton extends KeyboardPressButton {
         float available = BoundsPolicy.bounded(getWidth() - getPaddingLeft() - getPaddingRight()
             - DimensionPolicy.pixels(getContext(), 4), 1f, Float.MAX_VALUE);
         ViewPolicy.setTextSize(hintPaint, size);
-        float width = hintPaint.measureText(hintText);
+        int newline = hintText.indexOf('\n');
+        String first = newline >= 0 ? hintText.substring(0, newline) : hintText;
+        String second = newline >= 0 ? hintText.substring(newline + 1) : "";
+        float width = Math.max(hintPaint.measureText(first), second.isEmpty() ? 0f : hintPaint.measureText(second));
         if (width > available) ViewPolicy.setTextSize(hintPaint, size * available / width);
         hintPaint.setColor(hintColor);
         hintPaint.setAlpha(ColorPolicy.enabledAlpha(isEnabled(), 204, 96));
         Paint.FontMetrics metrics = hintPaint.getFontMetrics();
         float baseline = getHeight() - DimensionPolicy.floatPixels(getContext(), 2) * scale - metrics.bottom;
-        canvas.drawText(hintText, getWidth() / 2f, baseline, hintPaint);
+        if (newline >= 0) {
+            float firstBaseline = baseline - KeyFaceDomain.MULTILINE_STEP_EM * hintPaint.getTextSize();
+            if (!first.isEmpty()) canvas.drawText(first, getWidth() / 2f, firstBaseline, hintPaint);
+            if (!second.isEmpty()) canvas.drawText(second, getWidth() / 2f, baseline, hintPaint);
+        } else {
+            canvas.drawText(first, getWidth() / 2f, baseline, hintPaint);
+        }
     }
 }

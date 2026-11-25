@@ -49,6 +49,31 @@ public final class NineKeyShuangpinKeypadSmoke {
             .equals("零声母「a」的键「2」不对：零声母要两位数字"), "invalid key");
         check(NineKeyShuangpinKeypad.problemMessage("duplicate_unit", "initials", "zh", null)
             .equals("声母「zh」写了两次"), "duplicate");
+
+        check(NineKeyShuangpinKeypad.normalizedHintMode(null).equals("compact"), "default hint mode");
+        check(NineKeyShuangpinKeypad.normalizedHintMode("unknown").equals("compact"), "unknown hint mode");
+        check(NineKeyShuangpinKeypad.normalizedHintMode("both").equals("both"), "both hint mode");
+        check(NineKeyShuangpinKeypad.normalizedHintMode("dynamic").equals("dynamic"), "dynamic hint mode");
+        check(NineKeyShuangpinKeypad.hint(two, "compact", true).equals("零 b c"), "compact ignores expectingFinal");
+        check(NineKeyShuangpinKeypad.hint(two, "both", false).equals("零 b c\na ai iang"), "both shows initials and finals");
+        check(NineKeyShuangpinKeypad.hint(zero, "both", false).equals("u ü ei"), "both on final-only key");
+        check(NineKeyShuangpinKeypad.hint(two, "dynamic", false).equals("零 b c"), "dynamic initial phase");
+        check(NineKeyShuangpinKeypad.hint(two, "dynamic", true).equals("a ai iang"), "dynamic final phase");
+        check(NineKeyShuangpinKeypad.hint(zero, "dynamic", false).equals("韵母"), "dynamic initial phase on final-only key");
+        check(NineKeyShuangpinKeypad.hint(zero, "dynamic", true).equals("u ü ei"), "dynamic final phase on final-only key");
+        check(NineKeyShuangpinKeypad.hint(eight, "dynamic", true).equals(""), "dynamic final phase on initial-only key");
+
+        check(!NineKeyShuangpinKeypad.expectingFinal("", "", 0), "idle expects initial");
+        check(NineKeyShuangpinKeypad.expectingFinal("2", "2", 1), "single digit expects final");
+        check(!NineKeyShuangpinKeypad.expectingFinal("23", "23", 2), "two digits expect next initial");
+        check(NineKeyShuangpinKeypad.expectingFinal("236", "236", 3), "three digits expect final");
+        check(!NineKeyShuangpinKeypad.expectingFinal("8'", "8", 1), "trailing separator expects initial");
+        check(NineKeyShuangpinKeypad.expectingFinal("8'4", "84", 2), "digit after separator expects final");
+        check(NineKeyShuangpinKeypad.expectingFinal("ni'6", "646", 3), "locked syllable plus one digit expects final");
+        check(!NineKeyShuangpinKeypad.expectingFinal("ni'64", "6464", 4), "locked syllable plus two digits expects initial");
+        check(!NineKeyShuangpinKeypad.expectingFinal("e", "23", 2), "all locked expects initial");
+        check(NineKeyShuangpinKeypad.expectingFinal("8'45", "845", 2), "caret after 4 in 8'45 expects final");
+        check(!NineKeyShuangpinKeypad.expectingFinal("2345", "2345", 0), "caret at start expects initial");
         System.out.println("NineKeyShuangpinKeypadSmoke ok");
     }
 }

@@ -18,6 +18,7 @@ public final class NineKeyDigitButton extends KeyHintButton {
     private final Paint digitPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private String digitText = "";
     private int digitColor = Color.GRAY;
+    private boolean accentHint;
 
     public NineKeyDigitButton(Context context) {
         super(context);
@@ -50,6 +51,15 @@ public final class NineKeyDigitButton extends KeyHintButton {
         digitColor = color;
         invalidate();
     }
+
+    /** 底部提示是否改用皮肤强调色（九键双拼动态切换至韵母时突出显示）。 */
+    public void setAccentHint(boolean value) {
+        if (accentHint == value) return;
+        accentHint = value;
+        invalidate();
+    }
+
+    public boolean accentHint() { return accentHint; }
 
     @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);

@@ -130,6 +130,18 @@ public final class AndroidLocalSettingsSmoke {
         check(AndroidLocalSettings.spec(AndroidLocalSettings.NINE_KEY_COMPOSITION_ACTION)
             .accept(NineKeyCompositionActionPolicy.REWRITE).equals(NineKeyCompositionActionPolicy.REWRITE),
             "rewrite action is accepted");
+        check(NineKeyShuangpinKeypad.HINT_MODE_COMPACT.equals(
+            settings.choice(AndroidLocalSettings.NINE_KEY_SHUANGPIN_KEY_HINTS)), "nine-key shuangpin hints default to compact");
+        check(!AndroidLocalSettings.spec(AndroidLocalSettings.NINE_KEY_SHUANGPIN_KEY_HINTS).synced,
+            "nine-key shuangpin hints stay local");
+        check(NineKeyShuangpinKeypad.HINT_MODE_BOTH.equals(
+            AndroidLocalSettings.spec(AndroidLocalSettings.NINE_KEY_SHUANGPIN_KEY_HINTS).accept(NineKeyShuangpinKeypad.HINT_MODE_BOTH)),
+            "both hint mode is accepted");
+        check(NineKeyShuangpinKeypad.HINT_MODE_DYNAMIC.equals(
+            AndroidLocalSettings.spec(AndroidLocalSettings.NINE_KEY_SHUANGPIN_KEY_HINTS).accept(NineKeyShuangpinKeypad.HINT_MODE_DYNAMIC)),
+            "dynamic hint mode is accepted");
+        check(AndroidLocalSettings.spec(AndroidLocalSettings.NINE_KEY_SHUANGPIN_KEY_HINTS).accept("invalid") == null,
+            "unknown nine-key shuangpin hint mode is rejected");
         check(!settings.bool(AndroidLocalSettings.VOICE_CONTRIBUTE_AUDIO), "contribute audio default");
         check(settings.integer(AndroidLocalSettings.KEYBOARD_HEIGHT_ADJUSTMENT) == 0, "height default");
         check(!settings.has(AndroidLocalSettings.KEYBOARD_HEIGHT_ADJUSTMENT), "height is not explicit by default");

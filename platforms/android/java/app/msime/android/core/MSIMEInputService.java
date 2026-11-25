@@ -370,6 +370,7 @@ public final class MSIMEInputService extends InputMethodService {
     java.util.List<String> nineKeyDigitSidebarSymbols = java.util.List.of();
     /** 拼音九键组字时 1 键的动作，来自 Android 本机设置，缺省保留「分词」。 */
     String nineKeyCompositionAction = NineKeyCompositionActionPolicy.SEPARATE;
+    String nineKeyShuangpinHintMode = NineKeyShuangpinKeypad.DEFAULT_HINT_MODE;
     /** 大屏单手模式空出来那一侧放什么（#10203），来自共享偏好 `touch_one_handed_side_panel`，缺省空着；画不画还要看单手、屏宽和键面，见 {@link OneHandSidePadPolicy#shown}。 */
     OneHandSidePadPolicy.Panel oneHandedSidePanel = OneHandSidePadPolicy.Panel.OFF;
     /** 中/英键排在空格左边，来自共享偏好 `touch_language_key_side`（只有 `left` 算），缺省在右边、紧挨回车。 */
@@ -3378,6 +3379,7 @@ public final class MSIMEInputService extends InputMethodService {
         clipboardSuggestionActionEnabled = localSettings.bool(AndroidLocalSettings.CLIPBOARD_SUGGESTION_ACTION);
         clipboardSuggestionActionKind = localSettings.choice(AndroidLocalSettings.CLIPBOARD_SUGGESTION_ACTION_KIND);
         nineKeyCompositionAction = localSettings.choice(AndroidLocalSettings.NINE_KEY_COMPOSITION_ACTION);
+        nineKeyShuangpinHintMode = localSettings.choice(AndroidLocalSettings.NINE_KEY_SHUANGPIN_KEY_HINTS);
         toolbarFloating = localSettings.bool(AndroidLocalSettings.TOOLBAR_FLOATING);
         toolbarTextEdit = localSettings.bool(AndroidLocalSettings.TOOLBAR_TEXT_EDIT);
         toolbarDismiss = localSettings.bool(AndroidLocalSettings.TOOLBAR_DISMISS);
@@ -3827,7 +3829,8 @@ public final class MSIMEInputService extends InputMethodService {
             + shuangpinKeyHintsEnabled + ":" + quanpinShiftEnabled + ":" + splitKeyboardPortrait + ":" + japaneseToggleInputEnabled
             + ":" + spellingEditorEnabled + ":" + oneHandedSidePanel.wire + ":" + fourteenKeyLetterWidths.wire()
             + ":" + touchKeyStyles + ":" + numberRowEnabled + ":" + twentySixSymbolFirst + ":" + numberPadSpace.resolved() + ":" + languageKeyLeft
-            + ":" + NineKeySidebarPolicy.format(nineKeySidebarSymbols) + ":" + NineKeySidebarPolicy.format(nineKeyDigitSidebarSymbols);
+            + ":" + NineKeySidebarPolicy.format(nineKeySidebarSymbols) + ":" + NineKeySidebarPolicy.format(nineKeyDigitSidebarSymbols)
+            + ":" + nineKeyShuangpinHintMode;
     }
 
     private void reloadPreferences(String response) {
@@ -6634,6 +6637,15 @@ public final class MSIMEInputService extends InputMethodService {
     boolean nineKeyShuangpinDrawn() {
         return !dedicatedEnglish && nineKeyShuangpinGrid(view)
             && displayedTouchLayout(view) == QUANPIN_NINE_KEY_LAYOUT;
+    }
+
+    /** 九键双拼当前是否正等待输入韵母（已输入声母的一位数字）。 */
+    boolean nineKeyShuangpinExpectingFinal() {
+        if (!nineKeyShuangpinDrawn() || view == null) return false;
+        String editing = InputViewValuePolicy.editingText(view);
+        String preedit = InputViewValuePolicy.textOr(view, "preedit", "");
+        int caret = InputViewValuePolicy.integer(view, "caret_position", editing.length());
+        return NineKeyShuangpinKeypad.expectingFinal(preedit, editing, caret);
     }
 
     // 九键双拼的键面按偏好里的方案和自定义表从 host-api 取（NativeClient.nineKeyShuangpinLayout），请求没变时沿用上一次的结果；取不到时为空，键面退回只印数字。
@@ -12724,6 +12736,7 @@ public final class MSIMEInputService extends InputMethodService {
         // 数字页没重建时，临时模式等的进出也会改变随机数字的资格，键面跟着换。
         imeLayoutRows.syncNumberDigitFaces();
         updateSymbolKeyFaces();
+        imeLayoutRows.updateShuangpinKeyHints();
         updateLetterCornerHints();
         updateShuangpinKeyHints();
         updateQuickPunctuation();

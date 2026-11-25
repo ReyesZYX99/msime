@@ -26,6 +26,9 @@ final class KeyFaceRenderer {
     private String bottom = "";
     private float bottomX;
     private float bottomBaseline;
+    private String bottomSecond = "";
+    private float bottomSecondX;
+    private float bottomSecondBaseline;
 
     KeyFaceRenderer(KeyFaceGroup group) {
         this.group = group;
@@ -61,10 +64,11 @@ final class KeyFaceRenderer {
                 key.faceColor(KeyFaceSlot.TOP_RIGHT), template, enabled);
             canvas.drawText(corner, cornerX, cornerBaseline, paint);
         }
-        if (!bottom.isEmpty()) {
+        if (!bottom.isEmpty() || !bottomSecond.isEmpty()) {
             Paint paint = paint(measurer, KeyFaceSlot.BOTTOM, params.bottom().sizePx(), key.faceColor(KeyFaceSlot.BOTTOM),
                 template, enabled);
-            canvas.drawText(bottom, bottomX, bottomBaseline, paint);
+            if (!bottom.isEmpty()) canvas.drawText(bottom, bottomX, bottomBaseline, paint);
+            if (!bottomSecond.isEmpty()) canvas.drawText(bottomSecond, bottomSecondX, bottomSecondBaseline, paint);
         }
     }
 
@@ -122,9 +126,24 @@ final class KeyFaceRenderer {
         }
         KeyFaceParams.Hint under = params.bottom();
         bottom = under == null ? "" : TextPolicy.emptyIfNull(key.faceText(KeyFaceSlot.BOTTOM));
+        bottomSecond = "";
         if (!bottom.isEmpty()) {
-            bottomX = (width - measurer.advance(KeyFaceSlot.BOTTOM, bottom, under.sizePx())) / 2f;
-            bottomBaseline = height - under.insetPx() - under.inkBottomPx();
+            int newline = bottom.indexOf('\n');
+            if (newline >= 0) {
+                String first = bottom.substring(0, newline);
+                String second = bottom.substring(newline + 1);
+                bottom = first;
+                bottomSecond = second;
+                bottomSecondBaseline = height - under.insetPx() - under.inkBottomPx();
+                bottomBaseline = bottomSecondBaseline - KeyFaceDomain.MULTILINE_STEP_EM * under.sizePx();
+                if (!first.isEmpty())
+                    bottomX = (width - measurer.advance(KeyFaceSlot.BOTTOM, first, under.sizePx())) / 2f;
+                if (!second.isEmpty())
+                    bottomSecondX = (width - measurer.advance(KeyFaceSlot.BOTTOM, second, under.sizePx())) / 2f;
+            } else {
+                bottomX = (width - measurer.advance(KeyFaceSlot.BOTTOM, bottom, under.sizePx())) / 2f;
+                bottomBaseline = height - under.insetPx() - under.inkBottomPx();
+            }
         }
     }
 }

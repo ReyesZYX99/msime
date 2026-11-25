@@ -49,14 +49,57 @@ public final class NineKeyFaceDomains {
 
     /** 九键双拼：数字 0–9 作主标签，底部是当前表里每个数字的简短声韵提示（{@link NineKeyShuangpinKeypad#compactHint}）。 */
     public static KeyFaceDomain shuangpin(List<NineKeyShuangpinKeypad.Face> faces) {
+        return shuangpin(faces, NineKeyShuangpinKeypad.DEFAULT_HINT_MODE);
+    }
+
+    /** 九键双拼（按提示模式）：`compact` 放声母，`both` 放两行声韵母，`dynamic` 同时收入声母和韵母，动态切换只重画不重排。 */
+    public static KeyFaceDomain shuangpin(List<NineKeyShuangpinKeypad.Face> faces, String hintMode) {
         List<String> digits = new ArrayList<>();
         for (char digit = '0'; digit <= '9'; digit++) digits.add(String.valueOf(digit));
         List<String> hints = new ArrayList<>();
-        for (NineKeyShuangpinKeypad.Face face : faces) hints.add(NineKeyShuangpinKeypad.compactHint(face));
+        for (NineKeyShuangpinKeypad.Face face : faces) addShuangpinHints(hints, face, hintMode);
         Map<KeyFaceSlot, List<String>> texts = new EnumMap<>(KeyFaceSlot.class);
         texts.put(KeyFaceSlot.MAIN, digits);
         texts.put(KeyFaceSlot.BOTTOM, hints);
         return new KeyFaceDomain(texts);
+    }
+
+    /** 九键双拼主网格（1–9 键）的内容域，与窄底行 0 键分开算字号，避免 0 键把 1–9 键的提示字号整体压小。 */
+    public static KeyFaceDomain shuangpinGrid(List<NineKeyShuangpinKeypad.Face> faces, String hintMode) {
+        List<String> digits = new ArrayList<>();
+        for (char digit = '1'; digit <= '9'; digit++) digits.add(String.valueOf(digit));
+        List<String> hints = new ArrayList<>();
+        for (NineKeyShuangpinKeypad.Face face : faces) {
+            if (face.key() == '0') continue;
+            addShuangpinHints(hints, face, hintMode);
+        }
+        Map<KeyFaceSlot, List<String>> texts = new EnumMap<>(KeyFaceSlot.class);
+        texts.put(KeyFaceSlot.MAIN, digits);
+        texts.put(KeyFaceSlot.BOTTOM, hints);
+        return new KeyFaceDomain(texts);
+    }
+
+    /** 九键双拼底行 0 键的内容域。 */
+    public static KeyFaceDomain shuangpinZero(List<NineKeyShuangpinKeypad.Face> faces, String hintMode) {
+        List<String> hints = new ArrayList<>();
+        NineKeyShuangpinKeypad.Face zero = NineKeyShuangpinKeypad.face(faces, '0');
+        if (zero != null) addShuangpinHints(hints, zero, hintMode);
+        Map<KeyFaceSlot, List<String>> texts = new EnumMap<>(KeyFaceSlot.class);
+        texts.put(KeyFaceSlot.MAIN, List.of("0"));
+        texts.put(KeyFaceSlot.BOTTOM, hints);
+        return new KeyFaceDomain(texts);
+    }
+
+    private static void addShuangpinHints(List<String> hints, NineKeyShuangpinKeypad.Face face, String hintMode) {
+        String normalized = NineKeyShuangpinKeypad.normalizedHintMode(hintMode);
+        if (NineKeyShuangpinKeypad.HINT_MODE_BOTH.equals(normalized)) {
+            hints.add(NineKeyShuangpinKeypad.label(face));
+        } else if (NineKeyShuangpinKeypad.HINT_MODE_DYNAMIC.equals(normalized)) {
+            hints.add(NineKeyShuangpinKeypad.compactHint(face));
+            hints.add(NineKeyShuangpinKeypad.finalsHint(face));
+        } else {
+            hints.add(NineKeyShuangpinKeypad.compactHint(face));
+        }
     }
 
     /** 右列的 ！：九键标点表的最后一个。 */

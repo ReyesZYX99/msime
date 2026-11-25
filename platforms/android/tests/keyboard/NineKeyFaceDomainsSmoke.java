@@ -43,6 +43,15 @@ public final class NineKeyFaceDomainsSmoke {
             check(shuangpin.contains(KeyFaceSlot.BOTTOM, NineKeyShuangpinKeypad.compactHint(face)),
                 "缺表里的提示 " + NineKeyShuangpinKeypad.compactHint(face));
         check(!shuangpin.has(KeyFaceSlot.TOP_RIGHT), "九键双拼没有右上角");
+        List<NineKeyShuangpinKeypad.Face> withZero = List.of(
+            new NineKeyShuangpinKeypad.Face('2', List.of("b", "c"), List.of("a", "ai"), true),
+            new NineKeyShuangpinKeypad.Face('0', List.of(), List.of("in", "eng", "ing"), false));
+        KeyFaceDomain gridBoth = NineKeyFaceDomains.shuangpinGrid(withZero, NineKeyShuangpinKeypad.HINT_MODE_BOTH);
+        check(gridBoth.contains(KeyFaceSlot.BOTTOM, "零 b c\na ai"), "同显模式主网格应含两行声韵母");
+        check(!gridBoth.contains(KeyFaceSlot.MAIN, "0"), "主网格不含底行 0");
+        KeyFaceDomain zeroDynamic = NineKeyFaceDomains.shuangpinZero(withZero, NineKeyShuangpinKeypad.HINT_MODE_DYNAMIC);
+        check(zeroDynamic.contains(KeyFaceSlot.BOTTOM, "韵母") && zeroDynamic.contains(KeyFaceSlot.BOTTOM, "in eng ing"),
+            "动态模式底行 0 同时预留声母态与韵母态文字");
         System.out.println("NineKeyFaceDomainsSmoke passed");
     }
 

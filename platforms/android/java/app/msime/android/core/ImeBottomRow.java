@@ -638,12 +638,13 @@ final class ImeBottomRow {
         boolean shuangpinZero = layout == KeyboardLayout.QUANPIN_NINE_KEY_LAYOUT && s.nineKeyShuangpinDrawn();
         // 借用数字页的 0 记普通数字键，原拼音九键才记 Nine0；同一个常驻按键每次按当前键面重登。字母层的 0 带着双拼提示，进数字层时擦掉。
         if (numberPad) {
+            if (zeroButton() instanceof NineKeyDigitButton digitZero) digitZero.setAccentHint(false);
             if (zeroButton() instanceof KeyHintButton hinted) hinted.setHintText("");
             s.imeLayoutRows.bindNumberDigit(zeroButton(), 9);
             s.imeKeyFaces.attachNineDigit(zeroButton(), false);
         } else if (shuangpinZero) {
             s.imeLayoutRows.bindShuangpinZero(zeroButton());
-            s.imeKeyFaces.attachNineDigit(zeroButton(), true);
+            s.imeKeyFaces.attachNineShuangpinZero(zeroButton());
         }
         syncSplitSpace();
         if (s.globeButton != null) s.globeButton.setContentDescription("切换输入法");

@@ -1,0 +1,87 @@
+name: Build Android APK (Fork)
+on:
+  workflow_dispatch:
+    inputs:
+      edition:
+        description: 选择构建版本：pinyin（水杉拼音，包名 app.msime.android.pinyin，可与官方水杉共存）或 full（完整版，包名 app.msime.android）
+        required: false
+        default: pinyin
+        type: choice
+        options:
+          - pinyin
+          - full
+      run_host_checks:
+        description: 构建前先运行 Android 宿主契约与冒烟测试（platforms/android/check-host.sh）
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-fork-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      MSIME_EDITION: ${{ inputs.edition }}
+      MSIME_ANDROID_OMIT_ON_DEMAND: '1'
+      MSIME_REQUIRE_WORDBOOKS: '1'
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      GRADLE_OPTS: -Dorg.gradle.internal.repository.max.tentatives=6 -Dorg.gradle.internal.repository.initial.backoff=5000
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install ripgrep and Android SDK packages
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes ripgrep
+          sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          { yes || true; } | "$sdk/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
+          "$sdk/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "platforms;android-36" "build-tools;35.0.0"
+
+      - name: Install pinned Android NDK
+        run: bash platforms/android/install-ndk.sh
+
+      - name: Run Android host contract & smoke checks
+        if: ${{ inputs.run_host_checks }}
+        run: bash platforms/android/check-host.sh
+
+      - name: Build bundled wordbooks
+        run: python3 scripts/fetch_wordbooks.py
+
+      - name: Prepare pinned vcpkg and Android Rust target
+        run: |
+          set -euo pipefail
+          bash platforms/windows/bootstrap-vcpkg.sh
+          bash scripts/rustup-install.sh aarch64-linux-android
+
+      - name: Resolve Gradle build classpath
+        run: bash platforms/android/resolve-gradle-classpath.sh
+
+      - name: Build Android APK
+        run: |
+          set -euo pipefail
+          mkdir -p target/resources dist
+          resource_dir="$(cargo run --quiet -p msime-client-core --example install_resources -- target/resources)"
+          bash platforms/android/build-apk.sh "$resource_dir"
+          apk_name="$(python3 platforms/android/scripts/edition_android.py field --edition "$MSIME_EDITION" apk_name)"
+          cp "target/android/$apk_name.apk" dist/
+          ls -lh dist/
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: msime-android-${{ inputs.edition }}
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 14

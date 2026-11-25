@@ -7,6 +7,7 @@ import android.widget.LinearLayout;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.Nullable;
+import app.msime.android.AndroidLocalSettings;
 import app.msime.android.AppEdition;
 import app.msime.android.HttpBodyPolicy;
 import app.msime.android.KeyboardScheme;
@@ -38,7 +39,10 @@ public final class NineKeyShuangpinPage extends ReloadingDetailPage {
     private static final int MAX_IMPORT_BYTES = 16 * 1024;
     private static final List<String> PARTS = List.of("initials", "finals", "zero_initials");
 
+    private record State(JSONObject preferences, AndroidLocalSettings.Snapshot local) {}
+
     @Nullable private JSONObject preferences;
+    @Nullable private AndroidLocalSettings.Snapshot localSettings;
     /** 编辑中的自定义表；第一次打开页面时取保存着的表，没有时从米旮旯 3 的表开始。离开页面前不保存就丢掉。 */
     @Nullable private JSONObject draft;
     private boolean draftChanged;
@@ -58,13 +62,17 @@ public final class NineKeyShuangpinPage extends ReloadingDetailPage {
     }
 
     @Override protected void reload() {
-        HostTask.run(this, KeyboardSheets::preferences, loaded -> {
-            if (loaded == null) {
+        HostTask.run(this, context -> {
+            JSONObject loaded = KeyboardSheets.preferences(context);
+            return loaded == null ? null : new State(loaded, AndroidLocalSettings.load(context));
+        }, state -> {
+            if (state == null) {
                 MsToast.show(requireContext(), "读不出设置，请稍后重试");
                 return;
             }
-            preferences = loaded;
-            if (draft == null || !draftChanged) draft = initialDraft(loaded);
+            preferences = state.preferences();
+            localSettings = state.local();
+            if (draft == null || !draftChanged) draft = initialDraft(state.preferences());
             render();
         });
     }
@@ -106,6 +114,10 @@ public final class NineKeyShuangpinPage extends ReloadingDetailPage {
         choice.nav("自定义", savedUsable ? null : "先在下面编辑并保存一张自定义表",
             NineKeyShuangpinKeypad.CUSTOM_PROFILE.equals(profile) ? "使用中" : null,
             savedUsable ? () -> chooseProfile(NineKeyShuangpinKeypad.CUSTOM_PROFILE) : null).help("用下面保存的自定义表");
+        String hintMode = localSettings == null ? NineKeyShuangpinKeypad.DEFAULT_HINT_MODE
+            : localSettings.choice(AndroidLocalSettings.NINE_KEY_SHUANGPIN_KEY_HINTS);
+        choice.nav("键面提示", NineKeyShuangpinKeypad.hintModeSummary(hintMode),
+            NineKeyShuangpinKeypad.hintModeTitle(hintMode), () -> chooseHintMode(hintMode));
 
         JSONObject current = layout(profile, savedTable);
         GroupCard keys = GroupCard.add(sectionColumn(target, "键位"), "键位（" + NineKeyShuangpinKeypad.profileTitle(
@@ -228,6 +240,16 @@ public final class NineKeyShuangpinPage extends ReloadingDetailPage {
 
     private void chooseProfile(String profile) {
         savePreferences(values -> values.put("nine_key_shuangpin_profile", profile));
+    }
+
+    private void chooseHintMode(String current) {
+        OptionSheet sheet = new OptionSheet(requireContext(), "键面提示", "控制九键双拼数字键底部的声母和韵母提示");
+        for (String mode : NineKeyShuangpinKeypad.HINT_MODES) {
+            sheet.option(NineKeyShuangpinKeypad.hintModeTitle(mode), mode.equals(current),
+                () -> KeyboardSheets.saveLocal(this, AndroidLocalSettings.NINE_KEY_SHUANGPIN_KEY_HINTS,
+                    mode, this::reload, this::reload));
+        }
+        sheet.show();
     }
 
     private void useKeyboard() {
